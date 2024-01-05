@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/instance: chatbot
+    app.kubernetes.io/name: chatbot
+  name: chatbot
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: chatbot
+      app.kubernetes.io/name: chatbot
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: chatbot
+      creationTimestamp: null
+      labels:
+        allow-ingress-controller-traffic: "true"
+        app.kubernetes.io/instance: chatbot
+        app.kubernetes.io/name: chatbot
+        azure.workload.identity/use: "true"
+    spec:
+      containers:
+      - env:
+        - name: DEBUG
+          value: "true"
+        - name: PORT
+          value: "8080"
+        - name: BOT_TENANT_ID
+          value: <your-tenant-id>
+        - name: BOT_ID
+          value: <your-bot-id>
+        - name: AZURE_TENANT_ID
+          value: <your-tenant-id>
+        - name: AZURE_CLIENT_ID
+          value: <your-client-id>
+        image: chatbot:latest
+        imagePullPolicy: Always
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: http
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: chatbot
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: http
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 400Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /healthz
+            port: http
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: chatbot
+      serviceAccountName: chatbot
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir: {}
+        name: tmp

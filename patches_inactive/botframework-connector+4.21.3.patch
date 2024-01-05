@@ -1,0 +1,154 @@
+diff --git a/node_modules/botframework-connector/lib/auth/appCredentials.js b/node_modules/botframework-connector/lib/auth/appCredentials.js
+index 475cf75..ed47c86 100644
+--- a/node_modules/botframework-connector/lib/auth/appCredentials.js
++++ b/node_modules/botframework-connector/lib/auth/appCredentials.js
+@@ -41,11 +41,12 @@ class AppCredentials {
+      * @param channelAuthTenant Optional. The oauth token tenant.
+      * @param oAuthScope The scope for the token.
+      */
+-    constructor(appId, channelAuthTenant, oAuthScope = authenticationConstants_1.AuthenticationConstants.ToBotFromChannelTokenIssuer) {
++    constructor(appId, channelAuthTenant, oAuthScope = authenticationConstants_1.AuthenticationConstants.ToBotFromChannelTokenIssuer + "/.default") {
+         this.appId = appId;
+         this.tenant = channelAuthTenant;
+         this.oAuthEndpoint = authenticationConstants_1.AuthenticationConstants.ToChannelFromBotLoginUrlPrefix + this.tenant;
+         this.oAuthScope = oAuthScope;
++        console.log("GAP- using oAuthScope ", this.oAuthScope);
+     }
+     /**
+      * Gets tenant to be used for channel authentication.
+diff --git a/node_modules/botframework-connector/lib/auth/managedIdentityAppCredentials.js b/node_modules/botframework-connector/lib/auth/managedIdentityAppCredentials.js
+index 9101b70..d51e8d8 100644
+--- a/node_modules/botframework-connector/lib/auth/managedIdentityAppCredentials.js
++++ b/node_modules/botframework-connector/lib/auth/managedIdentityAppCredentials.js
+@@ -37,7 +37,14 @@ class ManagedIdentityAppCredentials extends appCredentials_1.AppCredentials {
+         (0, assert_1.ok)(tokenProviderFactory, 'ManagedIdentityAppCredentials.constructor(): missing tokenProviderFactory.');
+         this.tokenProviderFactory = tokenProviderFactory;
+         super.appId = appId;
+-        this.authenticator = new managedIdentityAuthenticator_1.ManagedIdentityAuthenticator(this.appId, this.oAuthScope, this.tokenProviderFactory);
++        const scopePostfix = '/.default';
++        let scope = this.oAuthScope;
++        console.log("GAP- patching managedIdentityAppCredentials.js file");
++        if (!scope.endsWith(scopePostfix)) {
++            scope = `${scope}${scopePostfix}`;
++        }
++        console.log("GAP- patched scope: ", scope);
++        this.authenticator = new managedIdentityAuthenticator_1.ManagedIdentityAuthenticator(this.appId, scope, this.tokenProviderFactory);
+     }
+     /**
+      * @inheritdoc
+diff --git a/node_modules/botframework-connector/lib/auth/managedIdentityAuthenticator.js b/node_modules/botframework-connector/lib/auth/managedIdentityAuthenticator.js
+index d2b03fb..bc57b7c 100644
+--- a/node_modules/botframework-connector/lib/auth/managedIdentityAuthenticator.js
++++ b/node_modules/botframework-connector/lib/auth/managedIdentityAuthenticator.js
+@@ -34,6 +34,7 @@ class ManagedIdentityAuthenticator {
+         (0, assert_1.ok)(appId === null || appId === void 0 ? void 0 : appId.trim(), 'ManagedIdentityAuthenticator.constructor(): missing appId.');
+         (0, assert_1.ok)(resource === null || resource === void 0 ? void 0 : resource.trim(), 'ManagedIdentityAuthenticator.constructor(): missing resource.');
+         (0, assert_1.ok)(tokenProviderFactory, 'ManagedIdentityAuthenticator.constructor(): missing tokenProviderFactory.');
++        console.log("GAP- managedIdentityAuthenticator.ts is used ", resource, appId);
+         this.resource = resource;
+         this.tokenProvider = tokenProviderFactory.createAzureServiceTokenProvider(appId);
+     }
+@@ -45,7 +46,14 @@ class ManagedIdentityAuthenticator {
+     getToken() {
+         return __awaiter(this, void 0, void 0, function* () {
+             // Retry gradually, starting from 10 ms up to 5 times.
+-            return (0, botbuilder_stdlib_1.retry)(() => this.tokenProvider.getToken(this.resource), 5, 10);
++            const scopePostfix = '/.default';
++            let scope = this.resource;
++            console.log("GAP- patching managedIdentityAuthenticator.js file");
++            if (!scope.endsWith(scopePostfix)) {
++                scope = `${scope}${scopePostfix}`;
++            }
++            console.log("GAP- managedIdentityAuthenticator.js patched scope: ", scope);
++            return (0, botbuilder_stdlib_1.retry)(() => this.tokenProvider.getToken(scope), 5, 10);
+         });
+     }
+ }
+diff --git a/node_modules/botframework-connector/lib/auth/microsoftAppCredentials.js b/node_modules/botframework-connector/lib/auth/microsoftAppCredentials.js
+index d11eda5..4fa2a30 100644
+--- a/node_modules/botframework-connector/lib/auth/microsoftAppCredentials.js
++++ b/node_modules/botframework-connector/lib/auth/microsoftAppCredentials.js
+@@ -41,7 +41,13 @@ class MicrosoftAppCredentials extends appCredentials_1.AppCredentials {
+     getToken(forceRefresh = false) {
+         var _a;
+         return __awaiter(this, void 0, void 0, function* () {
+-            (_a = this.credentials) !== null && _a !== void 0 ? _a : (this.credentials = new msalAppCredentials_1.MsalAppCredentials(this.appId, this.appPassword, this.oAuthEndpoint, this.oAuthScope));
++            const scopePostfix = '/.default';
++            let scope = this.oAuthScope;
++            if (!scope.endsWith(scopePostfix)) {
++                scope = `${scope}${scopePostfix}`;
++            }
++            console.log('GAP-Using custom scope with /.default prefix microsoftAppCredentials.js');
++            (_a = this.credentials) !== null && _a !== void 0 ? _a : (this.credentials = new msalAppCredentials_1.MsalAppCredentials(this.appId, this.appPassword, this.oAuthEndpoint, scope));
+             return this.credentials.getToken(forceRefresh);
+         });
+     }
+diff --git a/node_modules/botframework-connector/src/auth/appCredentials.ts b/node_modules/botframework-connector/src/auth/appCredentials.ts
+index a646f2a..4ff86bb 100644
+--- a/node_modules/botframework-connector/src/auth/appCredentials.ts
++++ b/node_modules/botframework-connector/src/auth/appCredentials.ts
+@@ -47,12 +47,13 @@ export abstract class AppCredentials implements msrest.ServiceClientCredentials
+     constructor(
+         appId: string,
+         channelAuthTenant?: string,
+-        oAuthScope: string = AuthenticationConstants.ToBotFromChannelTokenIssuer
++        oAuthScope: string = AuthenticationConstants.ToBotFromChannelTokenIssuer + "/.default"
+     ) {
+         this.appId = appId;
+         this.tenant = channelAuthTenant;
+         this.oAuthEndpoint = AuthenticationConstants.ToChannelFromBotLoginUrlPrefix + this.tenant;
+         this.oAuthScope = oAuthScope;
++        console.log("GAP- using oAuthScope ", this.oAuthScope);
+     }
+ 
+     /**
+diff --git a/node_modules/botframework-connector/src/auth/managedIdentityAppCredentials.ts b/node_modules/botframework-connector/src/auth/managedIdentityAppCredentials.ts
+index cc19c1b..8d80db0 100644
+--- a/node_modules/botframework-connector/src/auth/managedIdentityAppCredentials.ts
++++ b/node_modules/botframework-connector/src/auth/managedIdentityAppCredentials.ts
+@@ -34,7 +34,15 @@ export class ManagedIdentityAppCredentials extends AppCredentials {
+ 
+         this.tokenProviderFactory = tokenProviderFactory;
+         super.appId = appId;
+-        this.authenticator = new ManagedIdentityAuthenticator(this.appId, this.oAuthScope, this.tokenProviderFactory);
++
++        const scopePostfix = '/.default';
++        console.log("Checking of oauth scope must be appended with /.default", this.oAuthScope)
++        let scope = this.oAuthScope;
++        if (!scope.endsWith(scopePostfix)) {
++            console.log('Appending /.default to scope');
++            scope = `${scope}${scopePostfix}`;
++        }
++        this.authenticator = new ManagedIdentityAuthenticator(this.appId, scope, this.tokenProviderFactory);
+     }
+ 
+     /**
+diff --git a/node_modules/botframework-connector/src/auth/managedIdentityAuthenticator.ts b/node_modules/botframework-connector/src/auth/managedIdentityAuthenticator.ts
+index ae2ae8d..00b987c 100644
+--- a/node_modules/botframework-connector/src/auth/managedIdentityAuthenticator.ts
++++ b/node_modules/botframework-connector/src/auth/managedIdentityAuthenticator.ts
+@@ -30,6 +30,7 @@ export class ManagedIdentityAuthenticator {
+         ok(resource?.trim(), 'ManagedIdentityAuthenticator.constructor(): missing resource.');
+         ok(tokenProviderFactory, 'ManagedIdentityAuthenticator.constructor(): missing tokenProviderFactory.');
+ 
++        console.log("GAP- managedIdentityAuthenticator.ts is used ", resource, appId);
+         this.resource = resource;
+         this.tokenProvider = tokenProviderFactory.createAzureServiceTokenProvider(appId);
+     }
+@@ -40,7 +41,15 @@ export class ManagedIdentityAuthenticator {
+      * @returns {Promise<AccessToken>} A promise with the `AccessToken` provided by the [IJwtTokenProviderFactory](xref:botframework-connector.IJwtTokenProviderFactory) class.
+      */
+     async getToken(): Promise<AccessToken> {
++        console.log("ps-managedIdentityAuthenticator.ts is used - getting accessToken for resource", this.resource)
+         // Retry gradually, starting from 10 ms up to 5 times.
+-        return retry(() => this.tokenProvider.getToken(this.resource), 5, 10);
++        const scopePostfix = '/.default';
++        let scope = this.resource;
++        console.log("GAP- patching managedIdentityAuthenticator.ts file");
++        if (!scope.endsWith(scopePostfix)) {
++            scope = `${scope}${scopePostfix}`;
++        }
++        console.log("GAP- managedIdentityAuthenticator.ts patched scope: ", scope);
++        return retry(() => this.tokenProvider.getToken(scope), 5, 10);
+     }
+ }

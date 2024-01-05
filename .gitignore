@@ -1,0 +1,24 @@
+# TeamsFx files
+env/.env.*.user
+env/.env.local
+.localConfigs
+appPackage/build
+
+# dependencies
+node_modules/
+
+# misc
+.env
+.deployment
+.DS_Store
+
+# build
+lib/
+/.idea/gap-teams-chatbot.iml
+.idea/
+/deploy.zip
+/web.config
+platform_docs/
+platform_docs_test/
+dist/
+upload.zip
