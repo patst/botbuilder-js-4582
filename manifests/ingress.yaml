@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    # add an annotation indicating the issuer to use.
+    cert-manager.io/cluster-issuer: <nameOfClusterIssuer>
+  name: gap-chatbot
+spec:
+  rules:
+    - host: chatbot.<your-domain>
+      http:
+        paths:
+          - backend:
+              service:
+                name: chatbot
+                port:
+                  number: 80
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - chatbot.<your-domain>
+      secretName: chatbot-tls
